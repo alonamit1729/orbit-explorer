@@ -64,11 +64,7 @@ def _preimages_of(
 ) -> list[PreimageNode]:
     """Real solutions of f(x) = target.value, recursing to ``max_depth``."""
     y_expr = _point_value_expr(target)
-    eq_poly = sp.Poly(f_expr - y_expr, x)
-    try:
-        roots = eq_poly.real_roots()
-    except (sp.PolynomialError, NotImplementedError):
-        roots = []
+    roots = _real_preimages(f_expr, x, y_expr)
 
     nodes: list[PreimageNode] = []
     seen_here: set[str] = set()
@@ -82,11 +78,7 @@ def _preimages_of(
         if depth >= max_depth:
             # Check whether more preimages exist beyond our depth.
             r_y_expr = _point_value_expr(pt)
-            next_eq = sp.Poly(f_expr - r_y_expr, x)
-            try:
-                next_roots = next_eq.real_roots()
-            except (sp.PolynomialError, NotImplementedError):
-                next_roots = []
+            next_roots = _real_preimages(f_expr, x, r_y_expr)
             has_more = any(
                 _numeric_key_expr(rr) not in exclude
                 and _numeric_key_expr(rr) != key
@@ -102,6 +94,62 @@ def _preimages_of(
                 node.leaf_status = "terminal"
         nodes.append(node)
     return nodes
+
+
+def _real_preimages(
+    f_expr: sp.Expr, x: sp.Symbol, y_expr: sp.Expr
+) -> list[sp.Expr]:
+    """Real solutions of f(x) = y_expr.
+
+    Tries Poly.real_roots() first (fast, exact, works when both f and y are
+    over Q). Falls back to sp.solve() for radical / algebraic targets where
+    the polynomial sits in SymPy's EX domain and real_roots() refuses.
+    """
+    eq = f_expr - y_expr
+    try:
+        poly = sp.Poly(eq, x, domain=sp.QQ)
+        return poly.real_roots()
+    except (sp.PolynomialError, sp.CoercionFailed):
+        pass
+    # Generic Poly (any domain) — might still work
+    try:
+        poly = sp.Poly(eq, x)
+        return poly.real_roots()
+    except (sp.PolynomialError, NotImplementedError):
+        pass
+    # Fallback: symbolic solve, filter to real values.
+    try:
+        sols = sp.solve(eq, x)
+    except (NotImplementedError, sp.PolynomialError):
+        return []
+    real: list[sp.Expr] = []
+    for s in sols:
+        if not _is_real(s):
+            continue
+        real.append(sp.expand(s))
+    # Sort by numerical value for deterministic ordering.
+    real.sort(key=lambda v: float(sp.N(v, 30)))
+    return real
+
+
+def _is_real(value: sp.Expr, digits: int = 30) -> bool:
+    """Heuristic: a SymPy expression is treated as real if its symbolic
+    imaginary part simplifies to 0, or its numerical imaginary part is
+    negligibly small."""
+    try:
+        if sp.im(value) == 0:
+            return True
+    except Exception:
+        pass
+    try:
+        n = sp.N(value, digits)
+        if n.is_real:
+            return True
+        if abs(sp.im(n)) < sp.Float(10) ** -(digits - 5):
+            return True
+    except Exception:
+        return False
+    return False
 
 
 def _point_value_expr(p: Point) -> sp.Expr:

@@ -89,6 +89,26 @@ h1 {
   width: 70px;
 }
 
+.display-bar {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 12px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.display-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+.display-toggle input[type="checkbox"] {
+  margin: 0;
+}
+
 .error {
   color: var(--error);
   background: #fcecec;
@@ -118,7 +138,7 @@ h1 {
 
 .cycle-row {
   display: grid;
-  grid-template-columns: 200px 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 16px;
   align-items: stretch;
   padding: 12px;
@@ -126,6 +146,21 @@ h1 {
   border-radius: 6px;
   background: white;
   margin-bottom: 10px;
+}
+.cycle-row > div {
+  min-width: 0;
+  overflow: visible;
+}
+.cycle-row.stacked {
+  grid-template-columns: 1fr;
+}
+.cycle-row.stacked .cycle-graph-pane {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.cycle-row .realline-pane {
+  overflow: visible;
 }
 .cycle-row .cycle-meta {
   font-size: 12px;

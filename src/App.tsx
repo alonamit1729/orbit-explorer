@@ -28,6 +28,7 @@ function App() {
   const [data, setData] = useState<AnalyzeResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [showPreperiodic, setShowPreperiodic] = useState(true);
 
   // Fire-and-forget warm-up on page load so the first analyze call doesn't
   // also pay the cold-start cost of the Python serverless function.
@@ -70,6 +71,19 @@ function App() {
         onSubmit={run}
       />
 
+      {data && (
+        <div className="display-bar">
+          <label className="display-toggle">
+            <input
+              type="checkbox"
+              checked={showPreperiodic}
+              onChange={(e) => setShowPreperiodic(e.target.checked)}
+            />
+            show pre-periodic points
+          </label>
+        </div>
+      )}
+
       {error && <div className="error">{error}</div>}
 
       {!data && !busy && (
@@ -100,14 +114,27 @@ function App() {
                 {period.cycles.map((cycle, i) => {
                   const color = colorFor(globalCycleIdx++);
                   return (
-                    <div key={i} className="cycle-row">
-                      <div>
+                    <div
+                      key={i}
+                      className={`cycle-row${
+                        showPreperiodic ? " stacked" : ""
+                      }`}
+                    >
+                      <div className="cycle-graph-pane">
                         <div className="cycle-meta">cycle graph</div>
-                        <CycleGraphView cycle={cycle} color={color} />
+                        <CycleGraphView
+                          cycle={cycle}
+                          color={color}
+                          showPreperiodic={showPreperiodic}
+                        />
                       </div>
-                      <div>
+                      <div className="realline-pane">
                         <div className="cycle-meta">on the real line</div>
-                        <RealLineView cycle={cycle} color={color} />
+                        <RealLineView
+                          cycle={cycle}
+                          color={color}
+                          showPreperiodic={showPreperiodic}
+                        />
                       </div>
                     </div>
                   );
