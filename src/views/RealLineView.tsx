@@ -7,48 +7,59 @@ interface Props {
   color: string;
 }
 
-interface Mark {
-  x: number;             // numeric value
+interface PreMark {
   point: PointJSON;
-  role: "cycle" | "pre";
-  depth: number;         // 0 for cycle, 1..N for preimage depth
-  edgeFromValue?: number; // forward image (where f(this) lands), if known
+  x: number;                  // numeric value on the line
+  depth: number;              // 1, 2, …
+  parentX: number;            // x of the f-image (cycle pt for depth 1, parent preimage otherwise)
 }
 
 const WIDTH = 720;
-const HEIGHT = 130;
 const PAD_X = 32;
-const Y_AXIS = 70;        // y coord of the number-line axis
+const Y_AXIS = 70;
 const TICK_HEIGHT = 6;
+const DEPTH_ROW = 36;         // vertical spacing between preimage depth rows
+const CYCLE_LABEL_DY = 18;    // cycle label sits this far below the axis
+const PRE_FIRST_ROW_DY = 56;  // depth-1 preimages sit this far below the axis
+const ARROW_TRIM = 6;         // pixels trimmed off each arrow end so it doesn't sit on a dot
 
 export function RealLineView({ cycle, color }: Props) {
-  const { marks, xMin, xMax, scale } = useMemo(() => buildMarks(cycle), [cycle]);
+  const { cyclePoints, preMarks, xMin, xMax, scale, maxDepth } = useMemo(
+    () => buildLayout(cycle),
+    [cycle],
+  );
 
-  function project(value: number): number {
-    return PAD_X + (value - xMin) * scale;
-  }
+  const project = (value: number) => PAD_X + (value - xMin) * scale;
+  const depthY = (d: number) => Y_AXIS + PRE_FIRST_ROW_DY + (d - 1) * DEPTH_ROW;
+  const height = maxDepth >= 1 ? depthY(maxDepth) + 24 : Y_AXIS + 50;
 
-  // forward arrows: cycle -> next cycle point; pre -> its image
-  const cyclePoints: Mark[] = marks.filter((m) => m.role === "cycle");
-  const prePoints: Mark[] = marks.filter((m) => m.role === "pre");
+  const colorId = color.replace("#", "");
+  const markerColor = `arrow-${colorId}`;
+  const markerGrey = `arrow-grey-${colorId}`;
+  const n = cyclePoints.length;
 
-  // Cycle arrows: connect points[i] -> points[(i+1) % n]
-  const cycleArrows = cyclePoints.map((m, i) => {
-    const next = cyclePoints[(i + 1) % cyclePoints.length];
-    return { from: m.x, to: next.x };
+  // Cycle arrow specs (one per edge). For n=2 we use two bulge heights so
+  // the two opposite-direction arrows don't sit on top of each other.
+  const cycleArrows = cyclePoints.map((p, i) => {
+    const next = cyclePoints[(i + 1) % n];
+    let bulge: number;
+    if (n === 1) bulge = 0; // self-loop drawn separately if ever needed
+    else if (n === 2) bulge = i === 0 ? 0.55 : 0.28;
+    else bulge = 0.55;
+    return { from: p.x, to: next.x, bulge };
   });
 
   return (
     <svg
       className="realline"
       width="100%"
-      height={HEIGHT}
-      viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+      height={height}
+      viewBox={`0 0 ${WIDTH} ${height}`}
       preserveAspectRatio="xMidYMid meet"
     >
       <defs>
         <marker
-          id={`arrow-${color.replace("#", "")}`}
+          id={markerColor}
           viewBox="0 0 10 10"
           refX="9"
           refY="5"
@@ -59,7 +70,7 @@ export function RealLineView({ cycle, color }: Props) {
           <path d="M 0 0 L 10 5 L 0 10 z" fill={color} />
         </marker>
         <marker
-          id="arrow-grey"
+          id={markerGrey}
           viewBox="0 0 10 10"
           refX="9"
           refY="5"
@@ -67,7 +78,7 @@ export function RealLineView({ cycle, color }: Props) {
           markerHeight="5"
           orient="auto-start-reverse"
         >
-          <path d="M 0 0 L 10 5 L 0 10 z" fill="#888" />
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#7a7a7a" />
         </marker>
       </defs>
 
@@ -80,7 +91,6 @@ export function RealLineView({ cycle, color }: Props) {
         stroke="#999"
         strokeWidth={1}
       />
-      {/* axis ticks at integers within range */}
       {integerTicks(xMin, xMax).map((t) => (
         <g key={t}>
           <line
@@ -92,7 +102,7 @@ export function RealLineView({ cycle, color }: Props) {
           />
           <text
             x={project(t)}
-            y={Y_AXIS + TICK_HEIGHT + 11}
+            y={Y_AXIS - TICK_HEIGHT - 4}
             fontSize="10"
             fill="#888"
             textAnchor="middle"
@@ -102,7 +112,7 @@ export function RealLineView({ cycle, color }: Props) {
         </g>
       ))}
 
-      {/* cycle arcs (above the axis) */}
+      {/* cycle arcs above the axis */}
       {cycleArrows.map((a, i) => (
         <CycleArc
           key={i}
@@ -110,65 +120,102 @@ export function RealLineView({ cycle, color }: Props) {
           x2={project(a.to)}
           y={Y_AXIS}
           color={color}
+          bulge={a.bulge}
+          markerId={markerColor}
         />
       ))}
 
-      {/* pre-periodic arrows: pre point -> its forward image */}
-      {prePoints.map((m, i) =>
-        m.edgeFromValue != null ? (
+      {/* cycle points on the axis */}
+      {cyclePoints.map((p, i) => (
+        <g key={`cyc-${i}`}>
+          <circle
+            cx={project(p.x)}
+            cy={Y_AXIS}
+            r={5}
+            fill={color}
+            stroke={color}
+          >
+            <title>{p.point.decimal}</title>
+          </circle>
+          <foreignObject
+            x={project(p.x) - 60}
+            y={Y_AXIS + CYCLE_LABEL_DY}
+            width={120}
+            height={28}
+          >
+            <div
+              style={{ fontSize: 12, textAlign: "center", lineHeight: 1.1 }}
+              dangerouslySetInnerHTML={{
+                __html: katex.renderToString(displayLatex(p.point), {
+                  throwOnError: false,
+                  output: "html",
+                }),
+              }}
+            />
+          </foreignObject>
+        </g>
+      ))}
+
+      {/* preimage-tree connecting arrows (child -> parent, since f(child) = parent) */}
+      {preMarks.map((m, i) => {
+        const x1 = project(m.x);
+        const y1 = depthY(m.depth) - ARROW_TRIM;
+        const x2 = project(m.parentX);
+        const y2 =
+          m.depth === 1 ? Y_AXIS + ARROW_TRIM : depthY(m.depth - 1) + ARROW_TRIM;
+        return (
           <line
             key={`pre-arrow-${i}`}
-            x1={project(m.x)}
-            y1={Y_AXIS - 1}
-            x2={project(m.edgeFromValue)}
-            y2={Y_AXIS - 1}
-            stroke="#888"
-            strokeWidth={0.8}
-            markerEnd="url(#arrow-grey)"
-            opacity={0.55}
+            x1={x1}
+            y1={y1}
+            x2={x2}
+            y2={y2}
+            stroke="#7a7a7a"
+            strokeWidth={0.9}
+            opacity={0.6}
+            markerEnd={`url(#${markerGrey})`}
           />
-        ) : null,
-      )}
+        );
+      })}
 
-      {/* points */}
-      {marks.map((m, i) => {
-        const cx = project(m.x);
-        const isCycle = m.role === "cycle";
-        const r = isCycle ? 5 : 3.2;
+      {/* preimage dots and labels */}
+      {preMarks.map((m, i) => {
+        const px = project(m.x);
+        const py = depthY(m.depth);
         return (
-          <g key={i}>
+          <g key={`pre-${i}`}>
             <circle
-              cx={cx}
-              cy={Y_AXIS}
-              r={r}
-              fill={isCycle ? color : "white"}
+              cx={px}
+              cy={py}
+              r={4.5}
+              fill="white"
               stroke={color}
-              strokeWidth={isCycle ? 0 : 1.2}
+              strokeWidth={1.5}
             >
-              <title>{tooltip(m)}</title>
+              <title>{`preimage @ depth ${m.depth}: ${m.point.decimal}`}</title>
             </circle>
-            {isCycle && (
-              <foreignObject
-                x={cx - 60}
-                y={Y_AXIS + 18}
-                width={120}
-                height={32}
-              >
-                <div
-                  style={{
-                    fontSize: 12,
-                    textAlign: "center",
-                    lineHeight: 1.1,
-                  }}
-                  dangerouslySetInnerHTML={{
-                    __html: katex.renderToString(displayLatex(m.point), {
-                      throwOnError: false,
-                      output: "html",
-                    }),
-                  }}
-                />
-              </foreignObject>
-            )}
+            <foreignObject
+              x={px - 55}
+              y={py + 5}
+              width={110}
+              height={22}
+            >
+              <div
+                style={{
+                  fontSize: 11,
+                  textAlign: "center",
+                  lineHeight: 1.1,
+                  color: "#555",
+                }}
+                dangerouslySetInnerHTML={{
+                  __html: katex.renderToString(displayLatex(m.point), {
+                    throwOnError: false,
+                    output: "html",
+                  }),
+                }}
+              />
+            </foreignObject>
+            {m.point.kind !== "rational" && m.point.kind !== "radical" && null}
           </g>
         );
       })}
@@ -181,17 +228,22 @@ function CycleArc({
   x2,
   y,
   color,
+  bulge,
+  markerId,
 }: {
   x1: number;
   x2: number;
   y: number;
   color: string;
+  bulge: number;
+  markerId: string;
 }) {
   const dx = x2 - x1;
-  const r = Math.max(8, Math.abs(dx) / 2);
+  const span = Math.abs(dx);
+  const arcRadius = Math.max(8, span / 2);
+  const height = arcRadius * bulge;
   const mx = (x1 + x2) / 2;
-  const my = y - r * 0.55;
-  // quadratic curve above axis
+  const my = y - height;
   const path = `M ${x1} ${y - 4} Q ${mx} ${my}, ${x2} ${y - 4}`;
   return (
     <path
@@ -199,38 +251,48 @@ function CycleArc({
       fill="none"
       stroke={color}
       strokeWidth={1.3}
-      markerEnd={`url(#arrow-${color.replace("#", "")})`}
-      opacity={0.85}
+      markerEnd={`url(#${markerId})`}
+      opacity={0.9}
     />
   );
 }
 
 // ---------------------------------------------------------------------------
+// Layout
 
-function buildMarks(cycle: CycleJSON): {
-  marks: Mark[];
+interface CyclePos {
+  point: PointJSON;
+  x: number;
+}
+
+function buildLayout(cycle: CycleJSON): {
+  cyclePoints: CyclePos[];
+  preMarks: PreMark[];
   xMin: number;
   xMax: number;
   scale: number;
+  maxDepth: number;
 } {
-  const marks: Mark[] = cycle.points.map((p) => ({
-    x: parseFloat(p.short_decimal),
+  const cyclePoints: CyclePos[] = cycle.points.map((p) => ({
     point: p,
-    role: "cycle",
-    depth: 0,
+    x: parseFloat(p.short_decimal),
   }));
 
-  // pre-periodic
+  const preMarks: PreMark[] = [];
+  let maxDepth = 0;
   for (const tree of cycle.preperiodic_trees) {
     const targetIdx = tree.cycle_point_index;
-    const target = cycle.points[targetIdx];
-    const targetX = parseFloat(target.short_decimal);
-    walkTree(tree.roots, targetX, marks);
+    const targetX = cyclePoints[targetIdx].x;
+    collect(tree.roots, targetX, preMarks);
   }
+  for (const m of preMarks) maxDepth = Math.max(maxDepth, m.depth);
 
-  const values = marks.map((m) => m.x);
-  let xMin = Math.min(...values);
-  let xMax = Math.max(...values);
+  const allX = [
+    ...cyclePoints.map((p) => p.x),
+    ...preMarks.map((m) => m.x),
+  ];
+  let xMin = Math.min(...allX);
+  let xMax = Math.max(...allX);
   if (xMin === xMax) {
     xMin -= 1;
     xMax += 1;
@@ -239,25 +301,25 @@ function buildMarks(cycle: CycleJSON): {
   xMin -= span * 0.1;
   xMax += span * 0.1;
   const scale = (WIDTH - 2 * PAD_X) / (xMax - xMin);
-  return { marks, xMin, xMax, scale };
+
+  return { cyclePoints, preMarks, xMin, xMax, scale, maxDepth };
 }
 
-function walkTree(
+function collect(
   nodes: PreimageNodeJSON[],
   parentX: number,
-  out: Mark[],
+  out: PreMark[],
 ): void {
   for (const node of nodes) {
     const x = parseFloat(node.point.short_decimal);
     out.push({
-      x,
       point: node.point,
-      role: "pre",
+      x,
       depth: node.depth,
-      edgeFromValue: parentX,
+      parentX,
     });
     if (node.children.length) {
-      walkTree(node.children, x, out);
+      collect(node.children, x, out);
     }
   }
 }
@@ -272,14 +334,6 @@ function integerTicks(xMin: number, xMax: number): number[] {
   const out: number[] = [];
   for (let v = lo; v <= hi; v += step) out.push(v);
   return out;
-}
-
-function tooltip(m: Mark): string {
-  const label =
-    m.point.kind === "algebraic" && m.point.label
-      ? `${m.point.label}`
-      : m.point.short_decimal;
-  return `${m.role === "cycle" ? "cycle" : `preimage @ depth ${m.depth}`}: ${label} ≈ ${m.point.short_decimal}`;
 }
 
 function displayLatex(p: PointJSON): string {

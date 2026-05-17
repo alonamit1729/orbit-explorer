@@ -94,7 +94,7 @@ function App() {
             return (
               <div key={period.period} className="period-block">
                 <div className="period-header">
-                  Period {period.period} — {period.cycles.length}{" "}
+                  Period {period.period}: {period.cycles.length}{" "}
                   {period.cycles.length === 1 ? "cycle" : "cycles"}
                 </div>
                 {period.cycles.map((cycle, i) => {
