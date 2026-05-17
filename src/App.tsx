@@ -4,6 +4,7 @@ import { Tex } from "./math/Tex";
 import { PolynomialInput } from "./components/PolynomialInput";
 import { SharkovskyNote } from "./components/SharkovskyNote";
 import { LegendPanel } from "./components/LegendPanel";
+import { GraphCard } from "./components/GraphCard";
 import { CycleGraphView } from "./views/CycleGraphView";
 import { RealLineView } from "./views/RealLineView";
 import type { AnalyzeResponse } from "./types";
@@ -121,20 +122,32 @@ function App() {
                       }`}
                     >
                       <div className="cycle-graph-pane">
-                        <div className="cycle-meta">cycle graph</div>
-                        <CycleGraphView
-                          cycle={cycle}
-                          color={color}
-                          showPreperiodic={showPreperiodic}
-                        />
+                        <GraphCard
+                          title="cycle graph"
+                          zoomed={
+                            <CycleGraphView
+                              cycle={cycle}
+                              color={color}
+                              showPreperiodic={showPreperiodic}
+                              size={700}
+                            />
+                          }
+                        >
+                          <CycleGraphView
+                            cycle={cycle}
+                            color={color}
+                            showPreperiodic={showPreperiodic}
+                          />
+                        </GraphCard>
                       </div>
                       <div className="realline-pane">
-                        <div className="cycle-meta">on the real line</div>
-                        <RealLineView
-                          cycle={cycle}
-                          color={color}
-                          showPreperiodic={showPreperiodic}
-                        />
+                        <GraphCard title="on the real line">
+                          <RealLineView
+                            cycle={cycle}
+                            color={color}
+                            showPreperiodic={showPreperiodic}
+                          />
+                        </GraphCard>
                       </div>
                     </div>
                   );

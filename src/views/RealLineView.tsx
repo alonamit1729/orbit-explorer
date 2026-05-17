@@ -469,12 +469,16 @@ function SelfLoop({
   color: string;
   markerId: string;
 }) {
-  const r = 14;
+  // Loop above the axis; the preimage subtree (if any) lives below the axis
+  // and the depth-1 connector drops straight down, so we keep the loop fully
+  // above to avoid crossings.
+  const r = 10;
   const sx = cx + 4;
-  const sy = y - 4;
+  const sy = y - 5;
   const ex = cx - 4;
-  const ey = y - 4;
-  const d = `M ${sx} ${sy} A ${r} ${r} 0 1 1 ${ex} ${ey}`;
+  const ey = y - 5;
+  // sweep=0 sends the arc up-and-over (the short way, above the axis).
+  const d = `M ${sx} ${sy} A ${r} ${r} 0 1 0 ${ex} ${ey}`;
   return (
     <path
       d={d}

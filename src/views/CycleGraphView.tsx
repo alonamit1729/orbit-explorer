@@ -199,12 +199,18 @@ export function CycleGraphView({
         />
       ))}
 
-      {/* cycle vertices on top */}
+      {/* cycle vertices on top.  When pre-images are shown for n >= 3 we
+         tuck the vertex label inside the cycle (toward the empty center)
+         so it doesn't sit on top of the depth-1 preimage in the same
+         radial direction.  For n <= 2 there's no preimage in line with
+         the vertex label, so the usual outward placement is fine. */}
       {positions.map((p, i) => {
         const out = n === 1 ? 0 : Math.cos(p.theta);
         const above = n === 1 ? 1 : Math.sin(p.theta);
-        const labelDx = out * 18;
-        const labelDy = above * 18 + 4;
+        const labelInside = showPreperiodic && n >= 3;
+        const rad = labelInside ? -16 : 18;
+        const labelDx = out * rad;
+        const labelDy = above * rad + (labelInside ? -2 : 4);
         return (
           <PointDot
             key={i}
@@ -445,12 +451,18 @@ function SelfLoop({
   color: string;
   markerId: string;
 }) {
-  const lr = 18;
-  const sx = cx + VERTEX_R;
+  // For n=1, the radial preimage layout places depth-1 preimages at theta=0
+  // (directly to the right) and deeper ones above/below. The self-loop
+  // therefore sits on the LEFT, where there's no preimage edge to cross.
+  // Small radius so the loop stays compact and doesn't overlap the dot.
+  const lr = 11;
+  const sx = cx - VERTEX_R;
   const sy = cy - 1;
-  const ex = cx + VERTEX_R;
+  const ex = cx - VERTEX_R;
   const ey = cy + 1;
-  const d = `M ${sx} ${sy} A ${lr} ${lr} 0 1 1 ${ex} ${ey}`;
+  // sweep-flag = 0 with large-arc-flag = 1 sends the long arc the LEFT way
+  // (counter-clockwise) around a center sitting to the left of the dot.
+  const d = `M ${sx} ${sy} A ${lr} ${lr} 0 1 0 ${ex} ${ey}`;
   return (
     <path
       d={d}

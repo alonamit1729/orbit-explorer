@@ -162,6 +162,104 @@ h1 {
 .cycle-row .realline-pane {
   overflow: visible;
 }
+
+/* GraphCard: thin header bar with the meta label on the left and the
+ * action icons on the right; the body is the SVG itself. */
+.graph-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+.graph-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.graph-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.graph-card-toast {
+  font-size: 11px;
+  color: var(--muted);
+}
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  width: 26px;
+  height: 26px;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+}
+.icon-btn:hover {
+  color: var(--fg);
+  background: var(--panel-bg);
+  border-color: var(--border);
+}
+.graph-card-body {
+  display: flex;
+  justify-content: center;
+}
+
+/* Zoom modal */
+.zoom-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 20, 20, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 24px;
+}
+.zoom-modal {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  width: min(1400px, calc(100vw - 48px));
+  height: min(900px, calc(100vh - 48px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.zoom-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-bg);
+}
+.zoom-modal-title {
+  font-weight: 600;
+  font-size: 14px;
+}
+.zoom-modal-body {
+  flex: 1;
+  overflow: auto;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.zoom-modal-body .cyclegraph {
+  width: 100%;
+  height: auto;
+  max-width: min(1100px, calc(100vh - 220px));
+  max-height: calc(100vh - 220px);
+}
+.zoom-modal-body .realline {
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+}
 .cycle-row .cycle-meta {
   font-size: 12px;
   color: var(--muted);
