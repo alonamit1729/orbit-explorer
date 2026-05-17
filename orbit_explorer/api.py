@@ -45,6 +45,7 @@ class PointJSON(BaseModel):
     latex: str
     decimal: str
     short_decimal: str
+    degree: int
     label: str | None = None
     min_poly_latex: str | None = None
     isolating_interval: tuple[str, str] | None = None
@@ -108,6 +109,7 @@ def point_to_json(p: Point) -> PointJSON:
             latex=p.latex,
             decimal=p.decimal,
             short_decimal=p.decimal,
+            degree=p.degree,
         )
     if isinstance(p, RadicalPoint):
         return PointJSON(
@@ -115,14 +117,16 @@ def point_to_json(p: Point) -> PointJSON:
             latex=p.latex,
             decimal=p.decimal,
             short_decimal=p.decimal,
+            degree=p.degree,
         )
     # AlgebraicPoint
     a, b = p.isolating_interval
     return PointJSON(
         kind="algebraic",
-        latex=p.label or "?",
+        latex=p.label or "",
         decimal=p.decimal,
         short_decimal=p.short_decimal,
+        degree=p.degree,
         label=p.label,
         min_poly_latex=p.min_poly_latex,
         isolating_interval=(str(a), str(b)),

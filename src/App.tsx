@@ -1,35 +1,21 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { analyze } from "./api";
 import { Tex } from "./math/Tex";
 import { PolynomialInput } from "./components/PolynomialInput";
 import { SharkovskyNote } from "./components/SharkovskyNote";
 import { LegendPanel } from "./components/LegendPanel";
 import { GraphCard } from "./components/GraphCard";
+import { PointInfoModal } from "./components/PointInfoModal";
 import { CycleGraphView } from "./views/CycleGraphView";
 import { RealLineView } from "./views/RealLineView";
-import type { AnalyzeResponse } from "./types";
-
-// Stable per-period color palette so cycles are visually distinguishable.
-const CYCLE_COLORS = [
-  "#2a5d9f", // blue
-  "#b53737", // red
-  "#208a47", // green
-  "#9f6f2a", // amber
-  "#7a3aa8", // purple
-  "#1d8a8a", // teal
-  "#c25c9a", // pink
-  "#5d7029", // olive
-];
-
-function colorFor(globalIdx: number): string {
-  return CYCLE_COLORS[globalIdx % CYCLE_COLORS.length];
-}
+import type { AnalyzeResponse, PointJSON } from "./types";
 
 function App() {
   const [data, setData] = useState<AnalyzeResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [showPreperiodic, setShowPreperiodic] = useState(true);
+  const [selectedPoint, setSelectedPoint] = useState<PointJSON | null>(null);
 
   // Fire-and-forget warm-up on page load so the first analyze call doesn't
   // also pay the cold-start cost of the Python serverless function.
@@ -55,7 +41,20 @@ function App() {
     }
   }
 
-  let globalCycleIdx = 0;
+  // Collect which degrees actually appear so the legend can dim the rest.
+  const degreesPresent = useMemo(() => {
+    const s = new Set<number>();
+    if (!data) return s;
+    for (const per of data.periods) {
+      for (const c of per.cycles) {
+        for (const p of c.points) s.add(p.degree);
+        for (const tree of c.preperiodic_trees) {
+          walkPoints(tree.roots, (p) => s.add(p.degree));
+        }
+      }
+    }
+    return s;
+  }, [data]);
 
   return (
     <div className="app">
@@ -112,55 +111,73 @@ function App() {
                   Period {period.period}: {period.cycles.length}{" "}
                   {period.cycles.length === 1 ? "cycle" : "cycles"}
                 </div>
-                {period.cycles.map((cycle, i) => {
-                  const color = colorFor(globalCycleIdx++);
-                  return (
-                    <div
-                      key={i}
-                      className={`cycle-row${
-                        showPreperiodic ? " stacked" : ""
-                      }`}
-                    >
-                      <div className="cycle-graph-pane">
-                        <GraphCard
-                          title="cycle graph"
-                          zoomed={
-                            <CycleGraphView
-                              cycle={cycle}
-                              color={color}
-                              showPreperiodic={showPreperiodic}
-                              size={700}
-                            />
-                          }
-                        >
+                {period.cycles.map((cycle, i) => (
+                  <div
+                    key={i}
+                    className={`cycle-row${
+                      showPreperiodic ? " stacked" : ""
+                    }`}
+                  >
+                    <div className="cycle-graph-pane">
+                      <GraphCard
+                        title="cycle graph"
+                        zoomed={
                           <CycleGraphView
                             cycle={cycle}
-                            color={color}
                             showPreperiodic={showPreperiodic}
+                            onPointClick={setSelectedPoint}
                           />
-                        </GraphCard>
-                      </div>
-                      <div className="realline-pane">
-                        <GraphCard title="on the real line">
-                          <RealLineView
-                            cycle={cycle}
-                            color={color}
-                            showPreperiodic={showPreperiodic}
-                          />
-                        </GraphCard>
-                      </div>
+                        }
+                      >
+                        <CycleGraphView
+                          cycle={cycle}
+                          showPreperiodic={showPreperiodic}
+                          onPointClick={setSelectedPoint}
+                        />
+                      </GraphCard>
                     </div>
-                  );
-                })}
+                    <div className="realline-pane">
+                      <GraphCard title="on the real line">
+                        <RealLineView
+                          cycle={cycle}
+                          showPreperiodic={showPreperiodic}
+                          onPointClick={setSelectedPoint}
+                        />
+                      </GraphCard>
+                    </div>
+                  </div>
+                ))}
               </div>
             );
           })}
 
-          <LegendPanel named={data.named_points} />
+          <LegendPanel degreesPresent={degreesPresent} />
         </>
+      )}
+
+      {selectedPoint && (
+        <PointInfoModal
+          point={selectedPoint}
+          onClose={() => setSelectedPoint(null)}
+        />
       )}
     </div>
   );
+}
+
+function walkPoints(
+  nodes: { point: PointJSON; children: { point: PointJSON; children: unknown[] }[] }[],
+  fn: (p: PointJSON) => void,
+): void {
+  for (const n of nodes) {
+    fn(n.point);
+    if (n.children && n.children.length) {
+      walkPoints(
+        n.children as unknown as Parameters<typeof walkPoints>[0],
+        fn,
+      );
+    }
+  }
 }
 
 export default App;

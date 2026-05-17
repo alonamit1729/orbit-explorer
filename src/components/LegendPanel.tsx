@@ -1,63 +1,46 @@
-import { useState } from "react";
-import { Tex } from "../math/Tex";
-import type { NamedPointJSON } from "../types";
+import { degreeColorEntries } from "../views/degreeColor";
 
-export function LegendPanel({ named }: { named: NamedPointJSON[] }) {
-  const [expanded, setExpanded] = useState<string | null>(null);
-
-  if (!named.length) return null;
-
-  const current = expanded
-    ? named.find((n) => n.label === expanded) ?? null
-    : null;
-
+/**
+ * Colour legend mapping vertex degree to colour. Replaces the old per-point
+ * letter index — individual algebraic points are now revealed by clicking
+ * a vertex (see ``PointInfoModal``).
+ *
+ * Only the degrees actually present in the response need to be highlighted;
+ * we show them all in order for context.
+ */
+export function LegendPanel({
+  degreesPresent,
+}: {
+  degreesPresent: Set<number>;
+}) {
+  const entries = degreeColorEntries().filter(
+    (e) => degreesPresent.has(e.degree) || e.degree <= 3,
+  );
   return (
     <div className="legend">
-      <h2>
-        Algebraic points <span className="legend-count">({named.length})</span>
-      </h2>
-      <div className="legend-chips">
-        {named.map((n) => {
-          const isActive = expanded === n.label;
+      <h2>Vertex colours</h2>
+      <p className="legend-sub">
+        Each dot is coloured by the degree of its minimal polynomial over ℚ.
+        Click any vertex to see its value.
+      </p>
+      <div className="legend-color-grid">
+        {entries.map((e) => {
+          const dim = !degreesPresent.has(e.degree);
           return (
-            <button
-              key={n.label}
-              type="button"
-              className={`legend-chip${isActive ? " active" : ""}`}
-              onClick={() =>
-                setExpanded((prev) => (prev === n.label ? null : n.label))
-              }
-              title={n.point.short_decimal}
+            <div
+              key={e.degree}
+              className={`legend-color-row${dim ? " dim" : ""}`}
             >
-              {n.label}
-            </button>
+              <span
+                className="degree-dot"
+                style={{ background: e.color }}
+                aria-hidden="true"
+              />
+              <span className="legend-color-label">{e.label}</span>
+            </div>
           );
         })}
       </div>
-      {current && (
-        <div className="legend-detail-panel">
-          <div className="legend-detail-head">
-            <span className="legend-label-big">{current.label}</span>{" "}
-            {current.point.min_poly_latex ? (
-              <span>
-                root of <Tex math={`${current.point.min_poly_latex} = 0`} />
-                {current.point.isolating_interval && (
-                  <>
-                    {" "}
-                    in{" "}
-                    <Tex
-                      math={`(${current.point.isolating_interval[0]},\\, ${current.point.isolating_interval[1]})`}
-                    />
-                  </>
-                )}
-              </span>
-            ) : (
-              <Tex math={current.point.latex} />
-            )}
-          </div>
-          <div className="legend-detail">≈ {current.point.decimal}</div>
-        </div>
-      )}
     </div>
   );
 }

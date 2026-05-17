@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl *)",
+      "Bash(until curl *)",
+      "Bash(.venv/bin/pytest *)",
+      "mcp__Claude_Preview__preview_screenshot"
+    ]
+  }
+}

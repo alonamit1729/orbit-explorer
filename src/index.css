@@ -274,65 +274,75 @@ h1 {
   border-radius: 6px;
 }
 .legend h2 {
-  margin: 0 0 10px 0;
+  margin: 0 0 6px 0;
   font-size: 14px;
   font-weight: 600;
 }
-.legend-count {
-  color: var(--muted);
-  font-weight: 400;
-}
-.legend-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.legend-chip {
-  font: inherit;
-  font-weight: 600;
-  font-size: 13px;
-  min-width: 32px;
-  padding: 4px 10px;
-  color: var(--accent);
-  background: white;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  cursor: pointer;
-}
-.legend-chip:hover {
-  background: #ffffff;
-  border-color: var(--accent);
-}
-.legend-chip.active {
-  background: var(--accent);
-  color: white;
-  border-color: var(--accent);
-}
-.legend-detail-panel {
-  margin-top: 12px;
-  padding: 10px 12px;
-  background: white;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-}
-.legend-detail-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 8px;
-  line-height: 1.5;
-}
-.legend-label-big {
-  font-weight: 700;
-  color: var(--accent);
-  font-size: 16px;
-}
-.legend-detail {
+.legend-sub {
+  margin: 0 0 10px 0;
   color: var(--muted);
   font-size: 12px;
-  margin-top: 6px;
+}
+.legend-color-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+}
+.legend-color-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+.legend-color-row.dim {
+  opacity: 0.4;
+}
+.legend-color-label {
+  color: var(--fg);
+}
+
+/* Coloured dot used in the legend, the point-info modal header, and
+ * inline wherever the colour swatch is referenced. */
+.degree-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  vertical-align: middle;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+/* Point info modal */
+.point-info-modal {
+  width: min(560px, calc(100vw - 48px));
+  height: auto;
+}
+.point-info-body {
+  padding: 18px 22px;
+  line-height: 1.6;
+}
+.point-info-row {
+  margin: 6px 0;
+  font-size: 15px;
+}
+.point-info-label {
+  color: var(--muted);
+  margin-right: 4px;
+}
+.point-info-decimal {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px dotted var(--border);
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: var(--muted);
   word-break: break-all;
+}
+.point-info-decimal-text {
+  color: var(--fg);
+}
+.vertex {
+  /* applied to the <g> wrapping each clickable vertex */
 }
 
 .empty {

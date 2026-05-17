@@ -5,6 +5,9 @@ export interface PointJSON {
   latex: string;
   decimal: string;
   short_decimal: string;
+  /** Degree of the minimal polynomial over Q (1 for rationals, 2 for quadratic
+   * irrationals, etc.). Drives vertex colour. */
+  degree: number;
   label?: string | null;
   min_poly_latex?: string | null;
   isolating_interval?: [string, string] | null;

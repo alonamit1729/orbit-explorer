@@ -1,19 +1,27 @@
 import katex from "katex";
 import type { CycleJSON, PointJSON, PreimageNodeJSON } from "../types";
 import { leafCount } from "./treeLayout";
+import { EDGE_COLOR, degreeColor } from "./degreeColor";
 
 interface Props {
   cycle: CycleJSON;
-  color: string;
-  size?: number;
   showPreperiodic: boolean;
+  onPointClick?: (p: PointJSON) => void;
 }
 
+/* Layout constants are in viewBox units. The SVG element uses
+ * width="100%" so the browser scales the whole viewBox up when the
+ * container is large (e.g. inside the zoom modal). Font sizes are also
+ * in viewBox units, so they scale with everything else — which is what
+ * keeps proportions sensible across both inline and zoomed renderings. */
 const VERTEX_R = 5;
 const PRE_R = 3.8;
-const ARC_PAD_RAD = 0.10;
+const BASE_R = 64;               // cycle's radius — fixed in viewBox units
 const RING_GAP = 24;             // radial spacing between preimage depth rings
-const LABEL_PAD = 22;            // extra outside radius for labels
+const LABEL_PAD = 26;            // extra outside radius for labels
+const ARC_PAD_RAD = 0.10;
+const VERTEX_LABEL_FONT = 11;
+const PRE_LABEL_FONT = 10;
 
 interface PlacedPre {
   point: PointJSON;
@@ -22,22 +30,13 @@ interface PlacedPre {
   y: number;
   parentX: number;
   parentY: number;
-  /** Outward radial direction (unit vector) — for label placement. */
   outX: number;
   outY: number;
 }
 
-export function CycleGraphView({
-  cycle,
-  color,
-  size: baseSizeProp = 180,
-  showPreperiodic,
-}: Props) {
+export function CycleGraphView({ cycle, showPreperiodic, onPointClick }: Props) {
   const n = cycle.points.length;
-  const baseSize = baseSizeProp;
-  const baseR = baseSize / 2 - 26;
 
-  // Compute max preimage depth (only if we're going to render preimages).
   const maxDepth = showPreperiodic
     ? cycle.preperiodic_trees.reduce(
         (d, t) => Math.max(d, maxTreeDepth(t.roots)),
@@ -45,19 +44,15 @@ export function CycleGraphView({
       )
     : 0;
 
-  const outerR = baseR + maxDepth * RING_GAP + LABEL_PAD;
-  const size = Math.max(baseSize, 2 * outerR + 20);
+  const outerR = BASE_R + maxDepth * RING_GAP + LABEL_PAD;
+  const size = 2 * outerR + 20;
   const cx = size / 2;
   const cy = size / 2;
-  const r = baseR;
-
-  const colorId = color.replace("#", "");
-  const markerId = `cycle-arrow-${colorId}`;
-  const markerPre = `pre-arrow-${colorId}`;
+  const r = BASE_R;
 
   const arrowMarker = (
     <marker
-      id={markerId}
+      id="cg-edge-arrow"
       viewBox="0 0 10 10"
       refX="9"
       refY="5"
@@ -65,28 +60,13 @@ export function CycleGraphView({
       markerHeight="5"
       orient="auto-start-reverse"
     >
-      <path d="M 0 0 L 10 5 L 0 10 z" fill={color} />
-    </marker>
-  );
-  const preMarker = (
-    <marker
-      id={markerPre}
-      viewBox="0 0 10 10"
-      refX="9"
-      refY="5"
-      markerWidth="4.5"
-      markerHeight="4.5"
-      orient="auto-start-reverse"
-    >
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7a7a7a" />
+      <path d="M 0 0 L 10 5 L 0 10 z" fill={EDGE_COLOR} />
     </marker>
   );
 
-  // Vertex positions for n >= 1.
+  // Vertex positions.
   const positions = cycle.points.map((_, i) => {
-    if (n === 1) {
-      return { x: cx, y: cy, theta: 0 };
-    }
+    if (n === 1) return { x: cx, y: cy, theta: 0 };
     const theta = -Math.PI / 2 + (2 * Math.PI * i) / n;
     return {
       x: cx + r * Math.cos(theta),
@@ -95,7 +75,7 @@ export function CycleGraphView({
     };
   });
 
-  // Build the radial preimage layout per cycle vertex.
+  // Radial preimage layout.
   const placed: PlacedPre[] = [];
   if (showPreperiodic) {
     const wedgeWidth = n === 1 ? 2 * Math.PI : (2 * Math.PI) / n;
@@ -105,12 +85,10 @@ export function CycleGraphView({
       );
       if (!tree || tree.roots.length === 0) continue;
       const center = positions[i].theta;
-      const wedgeStart = center - wedgeWidth / 2;
-      const wedgeEnd = center + wedgeWidth / 2;
       placeWedge(
         tree.roots,
-        wedgeStart,
-        wedgeEnd,
+        center - wedgeWidth / 2,
+        center + wedgeWidth / 2,
         positions[i].x,
         positions[i].y,
         cx,
@@ -124,18 +102,13 @@ export function CycleGraphView({
   return (
     <svg
       className="cyclegraph"
-      width={size}
-      height={size}
+      width="100%"
       viewBox={`0 0 ${size} ${size}`}
+      preserveAspectRatio="xMidYMid meet"
     >
-      <defs>
-        {arrowMarker}
-        {preMarker}
-      </defs>
+      <defs>{arrowMarker}</defs>
 
-      {n === 1 && (
-        <SelfLoop cx={cx} cy={cy} color={color} markerId={markerId} />
-      )}
+      {n === 1 && <SelfLoop cx={cx} cy={cy} />}
 
       {n === 2 && (
         <TwoCycleArcs
@@ -145,8 +118,6 @@ export function CycleGraphView({
           by={positions[1].y}
           cx={cx}
           cy={cy}
-          color={color}
-          markerId={markerId}
         />
       )}
 
@@ -164,27 +135,37 @@ export function CycleGraphView({
               key={i}
               d={`M ${sx} ${sy} A ${r} ${r} 0 0 1 ${ex} ${ey}`}
               fill="none"
-              stroke={color}
+              stroke={EDGE_COLOR}
               strokeWidth={1.3}
-              markerEnd={`url(#${markerId})`}
+              markerEnd="url(#cg-edge-arrow)"
             />
           );
         })}
 
-      {/* preimage tree edges (child -> parent, the f-image direction) */}
-      {placed.map((m, i) => (
-        <line
-          key={`pre-edge-${i}`}
-          x1={trimToward(m.x, m.y, m.parentX, m.parentY, PRE_R)[0]}
-          y1={trimToward(m.x, m.y, m.parentX, m.parentY, PRE_R)[1]}
-          x2={trimToward(m.parentX, m.parentY, m.x, m.y, VERTEX_R + 1)[0]}
-          y2={trimToward(m.parentX, m.parentY, m.x, m.y, VERTEX_R + 1)[1]}
-          stroke="#7a7a7a"
-          strokeWidth={0.9}
-          opacity={0.7}
-          markerEnd={`url(#${markerPre})`}
-        />
-      ))}
+      {/* preimage tree edges */}
+      {placed.map((m, i) => {
+        const [x1, y1] = trimToward(m.x, m.y, m.parentX, m.parentY, PRE_R);
+        const [x2, y2] = trimToward(
+          m.parentX,
+          m.parentY,
+          m.x,
+          m.y,
+          VERTEX_R + 1,
+        );
+        return (
+          <line
+            key={`pre-edge-${i}`}
+            x1={x1}
+            y1={y1}
+            x2={x2}
+            y2={y2}
+            stroke={EDGE_COLOR}
+            strokeWidth={0.9}
+            opacity={0.85}
+            markerEnd="url(#cg-edge-arrow)"
+          />
+        );
+      })}
 
       {/* preimage dots + labels */}
       {placed.map((m, i) => (
@@ -193,33 +174,29 @@ export function CycleGraphView({
           cx={m.x}
           cy={m.y}
           point={m.point}
-          color={color}
           outX={m.outX}
           outY={m.outY}
+          onClick={onPointClick}
         />
       ))}
 
-      {/* cycle vertices on top.  When pre-images are shown for n >= 3 we
-         tuck the vertex label inside the cycle (toward the empty center)
-         so it doesn't sit on top of the depth-1 preimage in the same
-         radial direction.  For n <= 2 there's no preimage in line with
-         the vertex label, so the usual outward placement is fine. */}
+      {/* cycle vertices last so they sit on top of edges */}
       {positions.map((p, i) => {
         const out = n === 1 ? 0 : Math.cos(p.theta);
         const above = n === 1 ? 1 : Math.sin(p.theta);
         const labelInside = showPreperiodic && n >= 3;
-        const rad = labelInside ? -16 : 18;
+        const rad = labelInside ? -18 : 18;
         const labelDx = out * rad;
         const labelDy = above * rad + (labelInside ? -2 : 4);
         return (
-          <PointDot
+          <VertexDot
             key={i}
             cx={p.x}
             cy={p.y}
             point={cycle.points[i]}
-            color={color}
             labelDx={labelDx}
             labelDy={labelDy}
+            onClick={onPointClick}
           />
         );
       })}
@@ -308,17 +285,7 @@ function placeNode(
   let cursor = angleStart;
   for (const c of node.children) {
     const share = (leafCount(c) / totalChildLeaves) * (angleEnd - angleStart);
-    placeNode(
-      c,
-      cursor,
-      cursor + share,
-      x,
-      y,
-      cx,
-      cy,
-      baseR,
-      out,
-    );
+    placeNode(c, cursor, cursor + share, x, y, cx, cy, baseR, out);
     cursor += share;
   }
 }
@@ -340,47 +307,56 @@ function trimToward(
 // ---------------------------------------------------------------------------
 // Subcomponents
 
-function PointDot({
+function VertexDot({
   cx,
   cy,
   point,
-  color,
   labelDx,
   labelDy,
+  onClick,
 }: {
   cx: number;
   cy: number;
   point: PointJSON;
-  color: string;
   labelDx: number;
   labelDy: number;
+  onClick?: (p: PointJSON) => void;
 }) {
-  const labelText =
-    point.kind === "algebraic" && point.label ? point.label : point.latex;
-  const html = katex.renderToString(labelText, {
-    throwOnError: false,
-    output: "html",
-  });
+  const fill = degreeColor(point.degree);
+  // Show an inline LaTeX label only for kinds whose value is shown inline
+  // (rationals and small radicals). Algebraic points have no compact label
+  // — the user reveals them by clicking.
+  const showLabel = point.kind !== "algebraic" && point.latex;
+  const html = showLabel
+    ? katex.renderToString(point.latex, { throwOnError: false, output: "html" })
+    : "";
   return (
-    <g>
-      <circle cx={cx} cy={cy} r={VERTEX_R} fill={color}>
-        <title>{point.decimal}</title>
+    <g
+      className="vertex"
+      onClick={onClick ? () => onClick(point) : undefined}
+      style={onClick ? { cursor: "pointer" } : undefined}
+    >
+      <circle cx={cx} cy={cy} r={VERTEX_R} fill={fill}>
+        <title>{tooltipFor(point)}</title>
       </circle>
-      <foreignObject
-        x={cx + labelDx - 50}
-        y={cy + labelDy - 8}
-        width={100}
-        height={24}
-      >
-        <div
-          style={{
-            textAlign: "center",
-            fontSize: 11,
-            lineHeight: 1.1,
-          }}
-          dangerouslySetInnerHTML={{ __html: html }}
-        />
-      </foreignObject>
+      {showLabel && (
+        <foreignObject
+          x={cx + labelDx - 50}
+          y={cy + labelDy - 8}
+          width={100}
+          height={24}
+        >
+          <div
+            style={{
+              textAlign: "center",
+              fontSize: VERTEX_LABEL_FONT,
+              lineHeight: 1.1,
+              pointerEvents: "none",
+            }}
+            dangerouslySetInnerHTML={{ __html: html }}
+          />
+        </foreignObject>
+      )}
     </g>
   );
 }
@@ -389,87 +365,83 @@ function PreDot({
   cx,
   cy,
   point,
-  color,
   outX,
   outY,
+  onClick,
 }: {
   cx: number;
   cy: number;
   point: PointJSON;
-  color: string;
   outX: number;
   outY: number;
+  onClick?: (p: PointJSON) => void;
 }) {
-  const labelText =
-    point.kind === "algebraic" && point.label ? point.label : point.latex;
-  const html = katex.renderToString(labelText, {
-    throwOnError: false,
-    output: "html",
-  });
+  const stroke = degreeColor(point.degree);
+  const showLabel = point.kind !== "algebraic" && point.latex;
+  const html = showLabel
+    ? katex.renderToString(point.latex, { throwOnError: false, output: "html" })
+    : "";
   const lx = cx + outX * 13;
   const ly = cy + outY * 13;
   return (
-    <g>
+    <g
+      className="vertex"
+      onClick={onClick ? () => onClick(point) : undefined}
+      style={onClick ? { cursor: "pointer" } : undefined}
+    >
       <circle
         cx={cx}
         cy={cy}
         r={PRE_R}
         fill="white"
-        stroke={color}
-        strokeWidth={1.3}
+        stroke={stroke}
+        strokeWidth={1.5}
       >
-        <title>{`preimage @ depth ${(point as { depth?: number }).depth ?? ""}: ${point.decimal}`}</title>
+        <title>{tooltipFor(point)}</title>
       </circle>
-      <foreignObject
-        x={lx - 40}
-        y={ly - 8}
-        width={80}
-        height={20}
-      >
-        <div
-          style={{
-            textAlign: "center",
-            fontSize: 10,
-            lineHeight: 1.1,
-            color: "#555",
-          }}
-          dangerouslySetInnerHTML={{ __html: html }}
-        />
-      </foreignObject>
+      {showLabel && (
+        <foreignObject x={lx - 40} y={ly - 8} width={80} height={20}>
+          <div
+            style={{
+              textAlign: "center",
+              fontSize: PRE_LABEL_FONT,
+              lineHeight: 1.1,
+              color: "#555",
+              pointerEvents: "none",
+            }}
+            dangerouslySetInnerHTML={{ __html: html }}
+          />
+        </foreignObject>
+      )}
     </g>
   );
 }
 
-function SelfLoop({
-  cx,
-  cy,
-  color,
-  markerId,
-}: {
-  cx: number;
-  cy: number;
-  color: string;
-  markerId: string;
-}) {
-  // For n=1, the radial preimage layout places depth-1 preimages at theta=0
-  // (directly to the right) and deeper ones above/below. The self-loop
-  // therefore sits on the LEFT, where there's no preimage edge to cross.
-  // Small radius so the loop stays compact and doesn't overlap the dot.
+function tooltipFor(point: PointJSON): string {
+  const kind =
+    point.degree === 1
+      ? "rational"
+      : point.degree === 2
+        ? "quadratic"
+        : `degree ${point.degree}`;
+  return `${kind}: ${point.short_decimal} (click to see value)`;
+}
+
+function SelfLoop({ cx, cy }: { cx: number; cy: number }) {
+  // small loop on the LEFT of the dot (preimages spread to the right)
   const lr = 11;
   const sx = cx - VERTEX_R;
   const sy = cy - 1;
   const ex = cx - VERTEX_R;
   const ey = cy + 1;
-  // sweep-flag = 0 with large-arc-flag = 1 sends the long arc the LEFT way
-  // (counter-clockwise) around a center sitting to the left of the dot.
   const d = `M ${sx} ${sy} A ${lr} ${lr} 0 1 0 ${ex} ${ey}`;
   return (
     <path
       d={d}
       fill="none"
-      stroke={color}
+      stroke={EDGE_COLOR}
       strokeWidth={1.2}
-      markerEnd={`url(#${markerId})`}
+      markerEnd="url(#cg-edge-arrow)"
     />
   );
 }
@@ -481,8 +453,6 @@ function TwoCycleArcs({
   by,
   cx,
   cy,
-  color,
-  markerId,
 }: {
   ax: number;
   ay: number;
@@ -490,10 +460,8 @@ function TwoCycleArcs({
   by: number;
   cx: number;
   cy: number;
-  color: string;
-  markerId: string;
 }) {
-  const r = Math.hypot(bx - cx, by - cy); // == chord/2 since opposing vertices
+  const r = Math.hypot(bx - cx, by - cy);
   const bulge = r * 0.55;
   const trim = VERTEX_R + 2;
   return (
@@ -501,16 +469,16 @@ function TwoCycleArcs({
       <path
         d={`M ${ax} ${ay + trim} Q ${cx + bulge} ${cy} ${bx} ${by - trim}`}
         fill="none"
-        stroke={color}
+        stroke={EDGE_COLOR}
         strokeWidth={1.3}
-        markerEnd={`url(#${markerId})`}
+        markerEnd="url(#cg-edge-arrow)"
       />
       <path
         d={`M ${bx} ${by - trim} Q ${cx - bulge} ${cy} ${ax} ${ay + trim}`}
         fill="none"
-        stroke={color}
+        stroke={EDGE_COLOR}
         strokeWidth={1.3}
-        markerEnd={`url(#${markerId})`}
+        markerEnd="url(#cg-edge-arrow)"
       />
     </>
   );
