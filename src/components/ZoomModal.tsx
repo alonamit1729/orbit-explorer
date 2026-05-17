@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { copyNodeAsImage } from "../utils/copyImage";
 
 interface Props {
@@ -33,7 +34,11 @@ export function ZoomModal({ title, children, onClose }: Props) {
     setTimeout(() => setToast(null), 1500);
   }
 
-  return (
+  // Render via a portal directly under <body> so the modal's SVG is not a
+  // DOM descendant of the .cycle-row that opened it. This prevents the
+  // inline CSS caps (`.cycle-row.stacked .cyclegraph { max-width: 420px }`)
+  // from winning over the zoom-modal caps by accident of specificity.
+  return createPortal(
     <div className="zoom-modal-backdrop" onClick={onClose}>
       <div className="zoom-modal" onClick={(e) => e.stopPropagation()}>
         <div className="zoom-modal-header">
@@ -64,7 +69,8 @@ export function ZoomModal({ title, children, onClose }: Props) {
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
