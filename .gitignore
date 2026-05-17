@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Vercel
+.vercel/
+
+# OS
+.DS_Store
+
+# Editor
+.idea/
+.vscode/
+
+# Claude Code per-user settings (keep .claude/launch.json shared, but not local perms)
+.claude/settings.local.json
