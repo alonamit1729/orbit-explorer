@@ -260,6 +260,25 @@ h1 {
   height: auto;
   max-width: 100%;
 }
+
+/* Inline (non-zoomed) sizes — without these caps the SVG with width="100%"
+ * fills the entire container, which is too big on wide windows. The zoom
+ * modal selectors above are more specific, so they take precedence inside
+ * the modal. */
+.cycle-row .cyclegraph {
+  width: 100%;
+  max-width: 360px;
+  height: auto;
+}
+.cycle-row.stacked .cyclegraph {
+  /* stacked rows have full row width; allow the graph a bit more space */
+  max-width: 420px;
+}
+.cycle-row .realline {
+  width: 100%;
+  max-width: 960px;
+  height: auto;
+}
 .cycle-row .cycle-meta {
   font-size: 12px;
   color: var(--muted);
